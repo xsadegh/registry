@@ -1,0 +1,258 @@
+{{define "series"}}
+<div class="series" data-show="{{.Key}}"{{if .Week}} hidden{{end}}>
+  <div class="nums">
+    <div><span>Pulls</span><b>{{.Pulls}}</b></div>
+    <div><span>Pushes</span><b>{{.Pushes}}</b></div>
+    <div><span>Egress</span><b>{{.Egress}}</b></div>
+  </div>
+  <div class="bars{{if .Week}} wk{{end}}">{{range .Bars}}<div data-label="{{.Label}}"><i style="height:{{.Height}}"></i></div>{{end}}</div>
+  <span class="hint" data-idle="{{.Idle}}">{{.Idle}}</span>
+</div>
+{{end}}
+
+{{define "content"}}
+<div class="app">
+  <header class="top">
+    <div class="brand">
+      <span class="logo">{{icon "box" 17}}</span>
+      <div><b>Registry</b><small>{{.Host}}</small></div>
+    </div>
+    <div class="stats">
+      {{range .Stats}}<div class="stat"><span>{{.Label}}</span><b>{{.Value}}{{with .Sub}} <small>{{.}}</small>{{end}}</b></div>{{end}}
+    </div>
+    <div class="actions">
+      <button type="button" class="btn code" data-copy="{{.Login}}" data-msg="Login command copied" title="Copy docker login command">docker login{{icon "copy" 14}}</button>
+      <button type="button" class="btn" data-open="tokens">{{icon "key-round" 14}}Tokens</button>
+      <form method="post" action="/logout"><button class="btn square" title="Sign out {{.Username}}">{{icon "log-out" 14}}</button></form>
+    </div>
+  </header>
+
+  <div class="cards">
+    <section class="card storage">
+      <div class="col">
+        <div class="card-h">
+          <span class="title">{{icon "database" 16}}Storage</span>
+          {{if .Disk}}<span class="pill{{if .Warn}} warn{{end}}" title="Disk is {{.Pct}} full">{{.Pct}}</span>{{else}}<span class="pill">S3</span>{{end}}
+        </div>
+        <div class="usage-row">
+          <div class="figure"><span class="big">{{.Used}}</span>{{if .Disk}}<span class="of">of {{.Capacity}}</span>{{end}}</div>
+          <div class="spark">
+            <svg viewBox="0 0 300 100" preserveAspectRatio="none" aria-hidden="true"><path d="{{.Area}}" fill="rgba(107,191,142,.12)"/><path d="{{.Line}}" fill="none" stroke="#6BBF8E" stroke-width="1.5" vector-effect="non-scaling-stroke" stroke-linejoin="round"/></svg>
+            <span>{{.Growth}}</span>
+          </div>
+        </div>
+        <div class="usage">{{range .Segs}}<span style="width:{{.Width}};background:{{.Color}}" title="{{.Label}} · {{.Value}}"></span>{{end}}</div>
+        <div class="legend">{{range .Legend}}<div><i class="dot" style="background:{{.Color}}"></i><span>{{.Label}}</span><b>{{.Value}}</b></div>{{end}}</div>
+        <div class="loc"><code>{{.Location}}</code></div>
+      </div>
+      <div class="col gc">
+        <div class="card-h">
+          <span class="sub-title">{{icon "rotate-cw" 14}}Garbage collection</span>
+          {{if .GCBusy}}<span class="pill warn"><i class="spin"></i>Running</span>{{else}}<button type="button" class="btn-sm" data-open="gc"{{if eq .Loose 0}} disabled{{end}}>Run now</button>{{end}}
+        </div>
+        <div class="figure"><span class="mid">{{.Reclaim}}</span><span class="of">reclaimable · {{.Loose}} blobs</span></div>
+        <dl class="kv">
+          <dt>Last run</dt><dd>{{.LastGC}}</dd>
+          <dt>Freed</dt><dd>{{.LastFreed}}</dd>
+          <dt>Removes</dt><dd>Unused layers and untagged manifests</dd>
+        </dl>
+      </div>
+    </section>
+
+    <section class="card" data-scope>
+      <div class="card-h">
+        <span class="title">{{icon "activity" 16}}Traffic</span>
+        <div class="seg"><button type="button" class="on" data-seg="24h">24h</button><button type="button" data-seg="7d">7d</button></div>
+      </div>
+      {{template "series" .Day}}
+      {{template "series" .Week}}
+    </section>
+
+    <section class="card activity" data-scope>
+      <div class="fill">
+        <div class="card-h">
+          <span class="title">{{icon "history" 16}}Activity</span>
+          <div class="seg"><button type="button" class="on" data-seg="all">All</button><button type="button" data-seg="push">Push</button><button type="button" data-seg="pull">Pull</button><button type="button" data-seg="delete">Del</button></div>
+        </div>
+        <div class="list">
+          {{range .Events}}<div class="ev" data-show="{{.Type}}" title="{{.Title}}"><span class="b b-{{.Type}}">{{.Label}}</span><span class="tg">{{.Target}}</span><span class="tm">{{.Ago}}</span></div>{{else}}<div class="empty">No activity yet</div>{{end}}
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <main class="main">
+    <section class="panel repos">
+      <div class="repos-h">
+        <div class="card-h">
+          <span class="title">{{icon "box" 16}}Repositories</span>
+          <div class="seg"><a href="?sort=recent"{{if eq .Sort "recent"}} class="on"{{end}}>Recent</a><a href="?sort=size"{{if eq .Sort "size"}} class="on"{{end}}>Size</a><a href="?sort=name"{{if eq .Sort "name"}} class="on"{{end}}>A–Z</a></div>
+        </div>
+        <label class="search">{{icon "search" 14}}<input id="q" data-filter="repo-list" placeholder="Search" autocomplete="off" aria-label="Search repositories"><kbd>/</kbd></label>
+      </div>
+      <div class="cols"><span>Name</span><span>Tags</span><span class="w58">Storage</span></div>
+      <div class="list" id="repo-list">
+        {{range .Repos}}<a class="repo{{if .On}} on{{end}}" href="/r/{{.Name}}{{$.Query}}" data-key="{{.Name}}" title="{{if .Public}}Public{{else}}Private{{end}}">{{if .Public}}{{icon "globe" 12}}{{else}}{{icon "lock" 12}}{{end}}<span class="n"><small>{{.NS}}</small>{{.Base}}</span><span class="c">{{.Tags}}</span><span class="s">{{.Size}}</span></a>{{end}}
+        <div class="empty" data-empty{{if .Repos}} hidden{{end}}>{{if .Repos}}No match for “<span data-q></span>”{{else}}No repositories yet{{end}}</div>
+      </div>
+    </section>
+
+    <section class="panel detail">
+      {{with .Repo}}
+      <div class="rhead">
+        <div class="rtitle">
+          <h1><small>{{.NS}}</small>{{.Base}}</h1>
+          <span class="meta">{{.Meta}}</span>
+          <div class="tools">
+            <form method="post" action="/visibility" class="seg">
+              <input type="hidden" name="repo" value="{{.Name}}">
+              <input type="hidden" name="back" value="{{$.Back}}">
+              <button name="public" value="0"{{if not .Public}} class="on"{{end}} title="Only tokens can pull">{{icon "lock" 12}}Private</button>
+              <button name="public" value="1"{{if .Public}} class="on"{{end}} title="Anyone can pull without a token">{{icon "globe" 12}}Public</button>
+            </form>
+            <button type="button" class="ib del" data-open="del-repo" title="Delete repository">{{icon "trash-2" 14}}</button>
+          </div>
+        </div>
+        <div class="cmd">{{icon "terminal" 14}}<code>{{.Pull}}</code><button type="button" class="primary" data-copy="{{.Pull}}" data-msg="Pull command copied">{{icon "copy" 13}}Copy</button></div>
+      </div>
+      <div class="tbar">
+        <span class="title">{{icon "tag" 16}}Tags <small>{{len .Tags}}</small></span>
+        <label class="filter">{{icon "search" 13}}<input data-filter="tag-list" placeholder="Filter tag or digest" autocomplete="off" aria-label="Filter tags"></label>
+      </div>
+      <div class="thead grid"><span class="first">Tag</span><span class="wide">Digest</span><span class="wide">Arch</span><span>Size</span><span class="wide">Pushed</span><span></span></div>
+      <div class="tags" id="tag-list">
+        {{range .Tags}}
+        <details class="t" data-key="{{.Name}} {{.Digest}}">
+          <summary class="grid">
+            <span class="tn">{{icon "chevron-right" 12 "chev"}}<b{{if .Latest}} class="latest"{{end}}>{{.Name}}</b></span>
+            <span class="dg wide">{{.Short}}</span>
+            <span class="ar wide" title="{{.Arch}}">{{.Arch}}</span>
+            <span class="sz">{{.Size}}</span>
+            <span class="ag wide">{{.Ago}}</span>
+            <span class="row-actions">
+              <button type="button" class="ib" data-copy="{{.Pull}}" data-msg="Pull command copied" title="Copy pull command">{{icon "copy" 14}}</button>
+              <button type="button" class="ib del" data-open="del-tag" data-tag="{{.Name}}" data-digest="{{.Digest}}" data-short="sha256:{{.Short}}…" data-others="{{join .Others ", "}}" title="Delete tag">{{icon "trash-2" 14}}</button>
+            </span>
+          </summary>
+          <div class="det" data-scope>
+            <dl class="dkv">
+              <dt>Digest</dt><dd class="digest"><code>{{.Digest}}</code><button type="button" class="ib xs" data-copy="{{.Digest}}" data-msg="Digest copied" title="Copy digest">{{icon "copy" 12}}</button></dd>
+              <dt>Type</dt><dd>{{.Type}}</dd>
+              <dt>Created</dt><dd>{{.Created}}</dd>
+              {{with .Revision}}<dt>Revision</dt><dd><code>{{.}}</code></dd>{{end}}
+              {{with .Others}}<dt>Also tagged</dt><dd class="chips">{{range .}}<span class="chip">{{.}}</span>{{end}}</dd>{{end}}
+              <dt></dt><dd><button type="button" class="btn-ghost" data-copy="{{.PullDigest}}" data-msg="Pull command copied">{{icon "copy" 12}}Pull by digest</button></dd>
+            </dl>
+            <div class="layers">
+              <div class="lh">
+                <span>Layers{{range $i, $p := .Plats}}<em data-show="{{$i}}"{{if $i}} hidden{{end}}> · {{$p.Total}}</em>{{end}}</span>
+                {{if gt (len .Plats) 1}}<div class="seg mono">{{range $i, $p := .Plats}}<button type="button" data-seg="{{$i}}"{{if not $i}} class="on"{{end}}>{{$p.Arch}}</button>{{end}}</div>{{end}}
+              </div>
+              {{range $i, $p := .Plats}}
+              <div data-show="{{$i}}"{{if $i}} hidden{{end}}>
+                {{range $p.Layers}}<div class="layer" title="{{.Cmd}}"><span class="n">{{.Index}}</span><code>{{.Cmd}}</code><span class="meter"><i style="width:{{.Width}}"></i></span><span class="s">{{.Size}}</span></div>{{end}}
+              </div>
+              {{end}}
+            </div>
+          </div>
+        </details>
+        {{end}}
+        <div class="empty pad" data-empty{{if .Tags}} hidden{{end}}>{{if .Tags}}No tags match “<span data-q></span>”{{else}}No tags in this repository{{end}}</div>
+      </div>
+
+      <dialog id="del-tag">
+        <form method="post" action="/tags/delete" class="dlg">
+          <input type="hidden" name="repo" value="{{.Name}}">
+          <input type="hidden" name="digest" data-fill="digest">
+          <input type="hidden" name="back" value="{{$.Back}}">
+          <div class="dlg-h">
+            <span class="dlg-ic bad">{{icon "trash-2" 19}}</span>
+            <div><h2>Delete <code data-fill="tag"></code>?</h2><p>Removes manifest <code data-fill="short"></code> from {{.Name}}. The next garbage collection frees the space.</p></div>
+          </div>
+          <div class="note" data-if="others">These tags point to the same manifest and are removed too: <b class="mono" data-fill="others"></b></div>
+          <div class="dlg-f"><button type="button" class="b-cancel" data-close>Cancel</button><button class="b-danger" data-busy>Delete</button></div>
+        </form>
+      </dialog>
+
+      <dialog id="del-repo">
+        <form method="post" action="/repos/delete" class="dlg">
+          <input type="hidden" name="repo" value="{{.Name}}">
+          <div class="dlg-h">
+            <span class="dlg-ic bad">{{icon "trash-2" 19}}</span>
+            <div><h2>Delete {{.Name}}?</h2><p>Removes the repository and its {{len .Tags}} tags. You cannot undo this. Run garbage collection after this to free {{.Size}}.</p></div>
+          </div>
+          <div class="dlg-f"><button type="button" class="b-cancel" data-close>Cancel</button><button class="b-danger" data-busy>Delete repository</button></div>
+        </form>
+      </dialog>
+      {{else}}
+      {{if $.Missing}}
+      <div class="empty pad">The repository <code>{{$.Missing}}</code> does not exist.</div>
+      {{else}}
+      <div class="start">
+        <span class="logo lg">{{icon "box" 22}}</span>
+        <h2>Push your first image</h2>
+        <ol>
+          <li><span>Create a token with push access.</span><button type="button" class="btn" data-open="tokens">{{icon "key-round" 14}}Tokens</button></li>
+          <li><span>Sign in. Use the token as the password.</span><div class="cmd"><code>{{$.Login}}</code><button type="button" class="primary" data-copy="{{$.Login}}" data-msg="Login command copied">{{icon "copy" 13}}Copy</button></div></li>
+          <li><span>Tag and push an image.</span><div class="cmd"><code>docker tag app {{$.Host}}/team/app && docker push {{$.Host}}/team/app</code><button type="button" class="primary" data-copy="docker tag app {{$.Host}}/team/app && docker push {{$.Host}}/team/app" data-msg="Push command copied">{{icon "copy" 13}}Copy</button></div></li>
+        </ol>
+      </div>
+      {{end}}
+      {{end}}
+    </section>
+  </main>
+
+  <dialog id="gc">
+    <form method="post" action="/gc" class="dlg">
+      <input type="hidden" name="back" value="{{.Back}}">
+      <div class="dlg-h">
+        <span class="dlg-ic warn">{{icon "rotate-cw" 19}}</span>
+        <div><h2>Run garbage collection?</h2><p>About {{.Loose}} unreferenced blobs ({{.Reclaim}}) and all untagged manifests are deleted. Pushes are rejected until the run finishes.</p></div>
+      </div>
+      <div class="dlg-f"><button type="button" class="b-cancel" data-close>Cancel</button><button class="b-ok" data-busy>Run now</button></div>
+    </form>
+  </dialog>
+
+  <dialog id="tokens" class="lg"{{if .OpenTokens}} data-auto{{end}}>
+    <div class="dlg">
+      <div class="dlg-h">
+        <span class="dlg-ic ok">{{icon "key-round" 19}}</span>
+        <div><h2>Access tokens</h2><p>Use a token as the password for <code>docker login</code>. Pull tokens read private repositories. Push tokens also push and delete.</p></div>
+        <button type="button" class="ib close" data-close title="Close">{{icon "x" 16}}</button>
+      </div>
+      {{with .NewToken}}
+      <div class="new-token">
+        <span>Copy the token now. You cannot see it again.</span>
+        <div class="cmd"><code>{{.}}</code><button type="button" class="primary" data-copy="{{.}}" data-msg="Token copied">{{icon "copy" 13}}Copy</button></div>
+      </div>
+      {{end}}
+      <div class="tok-list">
+        {{range .Tokens}}
+        <div class="tok{{if .Expired}} expired{{end}}">
+          <div class="tok-body">
+            <div class="tok-main"><b>{{.Name}}</b><span class="chip">{{.Access}}</span><span class="tok-repos mono">{{.Repos}}</span></div>
+            <div class="tok-meta">Created {{.Created}} · Used {{.Used}} · {{.Expires}}</div>
+          </div>
+          <form method="post" action="/tokens/delete">
+            <input type="hidden" name="id" value="{{.ID}}">
+            <input type="hidden" name="back" value="{{$.Back}}">
+            <button class="ib del" title="Revoke token">{{icon "trash-2" 14}}</button>
+          </form>
+        </div>
+        {{else}}<div class="empty">No tokens yet</div>{{end}}
+      </div>
+      <form method="post" action="/tokens" class="tok-form">
+        <input type="hidden" name="back" value="{{.Back}}">
+        <label class="field">Name<input class="input" name="name" placeholder="ci-deploy" required></label>
+        <label class="field">Access<select class="input" name="access"><option value="pull">Pull</option><option value="push">Pull and push</option></select></label>
+        <label class="field">Expires<select class="input" name="expires"><option value="30">In 30 days</option><option value="90">In 90 days</option><option value="365">In 1 year</option><option value="0">Never</option></select></label>
+        <label class="field full">Repositories<input class="input mono" name="repos" list="repo-names" placeholder="All repositories" autocomplete="off"><small>Leave empty for all repositories. Separate names with commas. team/* matches all repositories in team.</small></label>
+        <datalist id="repo-names">{{range .RepoNames}}<option value="{{.}}">{{end}}</datalist>
+        <div class="full end"><button class="b-ok" data-busy>{{icon "plus" 14}}Create token</button></div>
+      </form>
+    </div>
+  </dialog>
+
+  <div id="toast" class="toast"{{if not .Toast}} hidden{{end}}>{{icon "check" 15}}<span>{{.Toast}}</span></div>
+</div>
+{{end}}

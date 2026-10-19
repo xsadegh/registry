@@ -1,0 +1,68 @@
+image:
+  repository: registry
+  tag: ""
+  pullPolicy: IfNotPresent
+
+imagePullSecrets: []
+
+config:
+  log:
+    level: info
+    format: json
+  storage:
+    driver: filesystem
+
+s3:
+  existingSecret: ""
+  accessKey: ""
+  secretKey: ""
+
+serviceAccount:
+  create: true
+  name: ""
+  annotations: {}
+
+persistence:
+  enabled: true
+  existingClaim: ""
+  storageClass: ""
+  accessMode: ReadWriteOnce
+  size: 50Gi
+
+service:
+  type: ClusterIP
+  port: 5000
+
+ingress:
+  enabled: false
+  className: ""
+  host: registry.example.com
+  tlsSecret: ""
+  annotations:
+    nginx.ingress.kubernetes.io/proxy-body-size: "0"
+    nginx.ingress.kubernetes.io/proxy-request-buffering: "off"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "900"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "900"
+
+resources: {}
+
+podAnnotations: {}
+
+podSecurityContext:
+  runAsNonRoot: true
+  runAsUser: 65532
+  runAsGroup: 65532
+  fsGroup: 65532
+  seccompProfile:
+    type: RuntimeDefault
+
+securityContext:
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: true
+  capabilities:
+    drop:
+      - ALL
+
+nodeSelector: {}
+tolerations: []
+affinity: {}

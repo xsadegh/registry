@@ -1,0 +1,10 @@
+/data
+/registry
+/dist
+*.tgz
+*.test
+*.out
+.env
+.DS_Store
+.idea/
+.vscode/

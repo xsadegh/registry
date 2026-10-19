@@ -1,0 +1,12 @@
+{{define "content"}}
+<main class="auth">
+  <form class="auth-card" method="post" action="/login">
+    {{template "auth-brand" .}}
+    <h1>Sign in</h1>
+    {{with .Error}}<p class="err">{{.}}</p>{{end}}
+    <label class="field">Username<input class="input" name="username" value="{{.Username}}" autocomplete="username" required autofocus></label>
+    <label class="field">Password<input class="input" type="password" name="password" autocomplete="current-password" required></label>
+    <button class="b-ok block" type="submit">Sign in</button>
+  </form>
+</main>
+{{end}}

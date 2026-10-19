@@ -1,0 +1,17 @@
+The registry is starting.
+
+1. Read the setup code from the log:
+
+   kubectl logs -n {{ .Release.Namespace }} deploy/{{ include "registry.fullname" . }} | grep setup_code
+
+{{- if .Values.ingress.enabled }}
+
+2. Open https://{{ .Values.ingress.host }}/setup and enter the code.
+{{- else }}
+
+2. Forward a local port to the registry:
+
+   kubectl port-forward -n {{ .Release.Namespace }} svc/{{ include "registry.fullname" . }} 5000:{{ .Values.service.port }}
+
+3. Open http://localhost:5000/setup and enter the code.
+{{- end }}

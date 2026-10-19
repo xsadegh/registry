@@ -1,0 +1,7 @@
+data
+registry
+dist
+charts
+.git
+.github
+*.md

@@ -1,0 +1,15 @@
+{{define "content"}}
+<main class="auth">
+  <form class="auth-card" method="post" action="/setup">
+    {{template "auth-brand" .}}
+    <h1>Create your account</h1>
+    <p class="lead">This account is the only one. It signs in to the dashboard and creates tokens for <code>docker login</code>.</p>
+    {{with .Error}}<p class="err">{{.}}</p>{{end}}
+    <label class="field">Setup code<input class="input mono" name="code" autocomplete="off" required autofocus placeholder="From the server log"></label>
+    <label class="field">Username<input class="input" name="username" value="{{.Username}}" autocomplete="username" required></label>
+    <label class="field">Password<input class="input" type="password" name="password" autocomplete="new-password" minlength="10" required></label>
+    <label class="field">Password again<input class="input" type="password" name="confirm" autocomplete="new-password" minlength="10" required></label>
+    <button class="b-ok block" type="submit">Create account</button>
+  </form>
+</main>
+{{end}}
