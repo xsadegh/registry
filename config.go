@@ -18,6 +18,15 @@ type Config struct {
 	Server  ServerConfig  `yaml:"server"`
 	Log     LogConfig     `yaml:"log"`
 	Storage StorageConfig `yaml:"storage"`
+	Backup  BackupConfig  `yaml:"backup"`
+}
+
+type BackupConfig struct {
+	S3 S3Config `yaml:"s3"`
+}
+
+func (b BackupConfig) enabled() bool {
+	return b.S3.Bucket != ""
 }
 
 type ServerConfig struct {
@@ -94,6 +103,15 @@ func (c Config) validate() error {
 	default:
 		return errors.New("storage.driver must be filesystem or s3")
 	}
+	if c.Backup.enabled() {
+		b, s := c.Backup.S3, c.Storage.S3
+		if b.Region == "" && b.Endpoint == "" {
+			return errors.New("set backup.s3.region or backup.s3.endpoint")
+		}
+		if c.Storage.Driver == "s3" && b.Endpoint == s.Endpoint && b.url() == s.url() {
+			return errors.New("backup.s3 must not use the same bucket and prefix as storage.s3")
+		}
+	}
 	return nil
 }
 
@@ -101,7 +119,10 @@ func (c Config) driverParams() map[string]any {
 	if c.Storage.Driver == "filesystem" {
 		return map[string]any{"rootdirectory": c.Storage.Filesystem.Root}
 	}
-	s := c.Storage.S3
+	return c.Storage.S3.params()
+}
+
+func (s S3Config) params() map[string]any {
 	params := map[string]any{"bucket": s.Bucket, "forcepathstyle": s.ForcePathStyle}
 	for key, v := range map[string]string{
 		"region":         s.Region,
@@ -117,9 +138,13 @@ func (c Config) driverParams() map[string]any {
 	return params
 }
 
+func (s S3Config) url() string {
+	return strings.TrimSuffix("s3://"+s.Bucket+"/"+strings.Trim(s.Prefix, "/"), "/")
+}
+
 func (c Config) location() string {
 	if c.Storage.Driver == "s3" {
-		return strings.TrimSuffix("s3://"+c.Storage.S3.Bucket+"/"+strings.Trim(c.Storage.S3.Prefix, "/"), "/")
+		return c.Storage.S3.url()
 	}
 	return c.Storage.Filesystem.Root
 }

@@ -88,11 +88,13 @@ type gcRun struct {
 }
 
 type stats struct {
-	Events   []event              `json:"events"`
-	Hours    []hour               `json:"hours"`
-	Usage    map[string]int64     `json:"usage"`
-	LastUsed map[string]time.Time `json:"lastUsed"`
-	GC       []gcRun              `json:"gc"`
+	Events   []event                `json:"events"`
+	Hours    []hour                 `json:"hours"`
+	Usage    map[string]int64       `json:"usage"`
+	LastUsed map[string]time.Time   `json:"lastUsed"`
+	GC       []gcRun                `json:"gc"`
+	Backups  map[string]backupState `json:"backups"`
+	Settings time.Time              `json:"settingsBackup,omitzero"`
 }
 
 type store struct {
@@ -102,6 +104,7 @@ type store struct {
 	stats    stats
 	dirty    bool
 	log      *zap.Logger
+	onSave   func()
 }
 
 func openStore(lc fx.Lifecycle, d storagedriver.StorageDriver, log *zap.Logger) (*store, error) {
@@ -121,6 +124,9 @@ func openStore(lc fx.Lifecycle, d storagedriver.StorageDriver, log *zap.Logger) 
 	}
 	if s.stats.LastUsed == nil {
 		s.stats.LastUsed = map[string]time.Time{}
+	}
+	if s.stats.Backups == nil {
+		s.stats.Backups = map[string]backupState{}
 	}
 	if len(s.settings.Secret) == 0 {
 		s.settings.Secret = make([]byte, 32)
@@ -157,7 +163,13 @@ func (s *store) saveSettings() error {
 	if err != nil {
 		return err
 	}
-	return s.driver.PutContent(context.Background(), settingsPath, b)
+	if err := s.driver.PutContent(context.Background(), settingsPath, b); err != nil {
+		return err
+	}
+	if s.onSave != nil {
+		s.onSave()
+	}
+	return nil
 }
 
 func (s *store) flush() {
@@ -356,9 +368,34 @@ func (s *store) snapshot() stats {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	return stats{
-		Events: slices.Clone(s.stats.Events),
-		Hours:  slices.Clone(s.stats.Hours),
-		Usage:  maps.Clone(s.stats.Usage),
-		GC:     slices.Clone(s.stats.GC),
+		Events:   slices.Clone(s.stats.Events),
+		Hours:    slices.Clone(s.stats.Hours),
+		Usage:    maps.Clone(s.stats.Usage),
+		GC:       slices.Clone(s.stats.GC),
+		Backups:  maps.Clone(s.stats.Backups),
+		Settings: s.stats.Settings,
 	}
+}
+
+func (s *store) setBackup(repo string, b backupState) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.stats.Backups[repo] = b
+	s.dirty = true
+}
+
+func (s *store) setBackupError(repo, msg string) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	b := s.stats.Backups[repo]
+	b.Error = msg
+	s.stats.Backups[repo] = b
+	s.dirty = true
+}
+
+func (s *store) setSettingsBackup(t time.Time) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.stats.Settings = t
+	s.dirty = true
 }

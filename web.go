@@ -39,6 +39,7 @@ type server struct {
 	log       *zap.Logger
 	store     *store
 	reg       *registry
+	backup    *backup
 	pages     map[string]*template.Template
 	version   string
 	setupCode string
@@ -50,8 +51,8 @@ type head struct {
 	Refresh bool
 }
 
-func newServer(cfg Config, log *zap.Logger, st *store, reg *registry) (*server, error) {
-	s := &server{cfg: cfg, log: log.Named("web"), store: st, reg: reg, pages: map[string]*template.Template{}}
+func newServer(cfg Config, log *zap.Logger, st *store, reg *registry, b *backup) (*server, error) {
+	s := &server{cfg: cfg, log: log.Named("web"), store: st, reg: reg, backup: b, pages: map[string]*template.Template{}}
 	if err := s.loadTemplates(); err != nil {
 		return nil, err
 	}
@@ -147,6 +148,7 @@ func (s *server) routes() http.Handler {
 	ui.HandleFunc("POST /tags/delete", s.authed(s.deleteTag))
 	ui.HandleFunc("POST /repos/delete", s.authed(s.deleteRepo))
 	ui.HandleFunc("POST /gc", s.authed(s.runGC))
+	ui.HandleFunc("POST /backup", s.authed(s.runBackup))
 	ui.HandleFunc("POST /tokens", s.authed(s.createToken))
 	ui.HandleFunc("POST /tokens/delete", s.authed(s.deleteToken))
 	mux.Handle("/", http.NewCrossOriginProtection().Handler(ui))
@@ -332,6 +334,16 @@ func (s *server) runGC(w http.ResponseWriter, r *http.Request, user string) {
 	back(w, r, "Garbage collection started")
 }
 
+func (s *server) runBackup(w http.ResponseWriter, r *http.Request, user string) {
+	if !s.backup.enabled {
+		back(w, r, "Backup is not set up")
+		return
+	}
+	go s.backup.enqueueAll(context.Background())
+	s.log.Info("backup requested", zap.String("by", user))
+	back(w, r, "Backup started")
+}
+
 func (s *server) createToken(w http.ResponseWriter, r *http.Request, user string) {
 	name := strings.TrimSpace(r.FormValue("name"))
 	if name == "" {
@@ -437,6 +449,8 @@ type dashView struct {
 	Segs, Legend                       []segView
 	Line, Area, Growth                 string
 	Location                           string
+	Backup, BackupFailed               bool
+	BackupText, BackupTitle            string
 	Reclaim, LastGC, LastFreed         string
 	Loose                              int
 	GCBusy                             bool
@@ -659,11 +673,15 @@ func (s *server) dashboard(w http.ResponseWriter, r *http.Request, user string) 
 		Back:     r.URL.RequestURI(),
 		Sort:     cmp.Or(r.URL.Query().Get("sort"), "recent"),
 		Location: s.cfg.location(),
+		Backup:   s.backup.enabled,
 		Toast:    takeFlash(w, r, "toast"),
 		NewToken: takeFlash(w, r, "token"),
 		GCBusy:   s.reg.gcBusy.Load(),
 	}
 	v.OpenTokens = v.NewToken != "" || takeFlash(w, r, "tokens") != ""
+	if v.Backup {
+		v.BackupText, v.BackupTitle, v.BackupFailed = s.backupStatus(st)
+	}
 	v.Access, v.Expires = accessSelect, expiresSelect
 	if v.Sort != "recent" {
 		v.Query = "?sort=" + url.QueryEscape(v.Sort)
@@ -774,7 +792,7 @@ func (s *server) dashboard(w http.ResponseWriter, r *http.Request, user string) 
 		v.Repos = append(v.Repos, repoRow{Name: rp.Name, NS: ns, Base: base, Size: fmtBytes(rp.Size), Tags: len(rp.Tags), Public: s.store.isPublic(rp.Name), On: rp.Name == selected})
 	}
 	if rp := sc.repo(selected); rp != nil {
-		v.Repo = s.repoView(rp, host)
+		v.Repo = s.repoView(rp, host, st.Backups)
 		v.Title = rp.Name + " · Registry"
 	} else if selected != "" {
 		v.Missing = selected
@@ -801,7 +819,35 @@ func (s *server) dashboard(w http.ResponseWriter, r *http.Request, user string) 
 	s.render(w, http.StatusOK, "dashboard.html", v)
 }
 
-func (s *server) repoView(rp *repo, host string) *repoView {
+func (s *server) backupStatus(st stats) (string, string, bool) {
+	last, failed, firstErr := st.Settings, 0, ""
+	for name, b := range st.Backups {
+		if b.Time.After(last) {
+			last = b.Time
+		}
+		if b.Error != "" {
+			failed++
+			if firstErr == "" {
+				firstErr = name + ": " + b.Error
+			}
+		}
+	}
+	title := "Backup to " + s.backup.target + ". The newest image of each repository and the dashboard data."
+	if !last.IsZero() {
+		title += " Last run " + fmtDate(last) + " UTC."
+	}
+	switch {
+	case s.backup.running():
+		return "backing up", title, false
+	case failed > 0:
+		return fmt.Sprintf("backup failed for %d", failed), title + " " + firstErr, true
+	case last.IsZero():
+		return "backup pending", title, false
+	}
+	return "backup " + ago(last), title, false
+}
+
+func (s *server) repoView(rp *repo, host string, backups map[string]backupState) *repoView {
 	ns, base := splitName(rp.Name)
 	ref := host + "/" + rp.Name
 	rv := &repoView{Name: rp.Name, NS: ns, Base: base, Size: fmtBytes(rp.Size), Public: s.store.isPublic(rp.Name), Pull: "docker pull " + ref}
@@ -811,6 +857,16 @@ func (s *server) repoView(rp *repo, host string) *repoView {
 	}
 	if !rp.Pushed.IsZero() {
 		meta = append(meta, "pushed "+ago(rp.Pushed))
+	}
+	if s.backup.enabled && len(rp.Tags) > 0 {
+		switch b := backups[rp.Name]; {
+		case b.Error != "":
+			meta = append(meta, "backup failed")
+		case b.Time.IsZero():
+			meta = append(meta, "backup pending")
+		default:
+			meta = append(meta, "backed up "+ago(b.Time))
+		}
 	}
 	rv.Meta = strings.Join(meta, " · ")
 	if len(rp.Tags) > 0 {

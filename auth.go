@@ -249,6 +249,7 @@ func (s *server) track(r *http.Request, m []string, t *token, rec *recorder) {
 			if isTag {
 				pushes = 1
 				s.store.record(event{Type: "push", Repo: name, Ref: ref, Actor: actor})
+				s.backup.schedule(name, backupDelay)
 			}
 		case r.Method == http.MethodDelete && rec.status == http.StatusAccepted:
 			s.reg.stale.Store(true)

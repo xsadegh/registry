@@ -56,7 +56,11 @@
         </div>
         <div class="usage">{{range .Segs}}<span style="width:{{.Width}};background:{{.Color}}" title="{{.Label}} · {{.Value}}"></span>{{end}}</div>
         <div class="legend">{{range .Legend}}<div><i class="dot" style="background:{{.Color}}"></i><span>{{.Label}}</span><b>{{.Value}}</b></div>{{end}}</div>
-        <div class="loc"><code>{{.Location}}</code></div>
+        <div class="loc">
+          <code>{{.Location}}</code>
+          {{if .Backup}}<span class="bk{{if .BackupFailed}} bad{{end}}" title="{{.BackupTitle}}">· {{.BackupText}}</span>
+          <form method="post" action="/backup"><input type="hidden" name="back" value="{{.Back}}"><button class="link" data-busy title="Back up the newest image of every repository now">Back up now</button></form>{{end}}
+        </div>
       </div>
       <div class="col gc">
         <div class="card-h">

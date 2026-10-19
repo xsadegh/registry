@@ -27,7 +27,7 @@ func main() {
 
 	fx.New(
 		fx.Supply(cfg),
-		fx.Provide(newLogger, openDriver, openStore, newRegistry, newServer, newHTTPServer),
+		fx.Provide(newLogger, openDriver, openStore, newRegistry, newBackup, newServer, newHTTPServer),
 		fx.WithLogger(newFxLogger),
 		fx.Invoke(func(*http.Server) {}),
 	).Run()

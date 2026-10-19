@@ -206,16 +206,60 @@ func (r *registry) scan(ctx context.Context) (*scan, error) {
 }
 
 func (r *registry) open(ctx context.Context, name string) (distribution.Repository, distribution.ManifestService, error) {
+	return openRepo(ctx, r.ns, name)
+}
+
+func openRepo(ctx context.Context, ns distribution.Namespace, name string) (distribution.Repository, distribution.ManifestService, error) {
 	named, err := reference.WithName(name)
 	if err != nil {
 		return nil, nil, err
 	}
-	repository, err := r.ns.Repository(ctx, named)
+	repository, err := ns.Repository(ctx, named)
 	if err != nil {
 		return nil, nil, err
 	}
 	ms, err := repository.Manifests(ctx)
 	return repository, ms, err
+}
+
+func tagLink(name, tag string) string {
+	return path.Join(root, "repositories", name, "_manifests/tags", tag, "current/link")
+}
+
+func (r *registry) newest(ctx context.Context, name string) (digest.Digest, []string, error) {
+	repository, _, err := r.open(ctx, name)
+	if err != nil {
+		return "", nil, err
+	}
+	ts := repository.Tags(ctx)
+	names, err := ts.All(ctx)
+	if err != nil {
+		if notFound(err) {
+			return "", nil, nil
+		}
+		return "", nil, err
+	}
+	var best digest.Digest
+	var bestTime time.Time
+	digests := map[string]digest.Digest{}
+	for _, n := range names {
+		d, err := ts.Get(ctx, n)
+		if err != nil {
+			continue
+		}
+		digests[n] = d.Digest
+		if fi, err := r.driver.Stat(ctx, tagLink(name, n)); err == nil && fi.ModTime().After(bestTime) {
+			best, bestTime = d.Digest, fi.ModTime()
+		}
+	}
+	var tags []string
+	for n, d := range digests {
+		if d == best {
+			tags = append(tags, n)
+		}
+	}
+	slices.Sort(tags)
+	return best, tags, nil
 }
 
 func (r *registry) loadRepo(ctx context.Context, name string, sizes map[digest.Digest]int64, marked map[digest.Digest]bool) (*repo, error) {
@@ -236,7 +280,7 @@ func (r *registry) loadRepo(ctx context.Context, name string, sizes map[digest.D
 			continue
 		}
 		t := &tag{Name: n, Digest: d.Digest}
-		if fi, err := r.driver.Stat(ctx, path.Join(root, "repositories", name, "_manifests/tags", n, "current/link")); err == nil {
+		if fi, err := r.driver.Stat(ctx, tagLink(name, n)); err == nil {
 			t.Pushed = fi.ModTime()
 		}
 		if err := r.describe(ctx, repository, ms, t, own); err != nil {
