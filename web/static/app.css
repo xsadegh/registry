@@ -148,7 +148,7 @@ form{margin:0}
 .tools{margin-left:auto;display:flex;align-items:center;gap:6px}
 .tools .seg button{height:22px}
 .cmd{display:flex;align-items:center;gap:8px;min-width:0;height:34px;padding:0 4px 0 12px;background:var(--bar);border:1px solid var(--edge);border-radius:9px}
-.cmd .i{color:var(--icon)}
+.cmd>.i{color:var(--icon)}
 .cmd code{flex:1;min-width:0;font-size:12px;color:var(--fg2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .primary{height:26px;flex:none;padding:0 10px;border:0;border-radius:7px;background:var(--accent);color:#141516;font-size:12px;font-weight:600;display:inline-flex;align-items:center;gap:5px}
 .primary:hover{background:var(--accent2)}
