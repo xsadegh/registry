@@ -51,6 +51,22 @@ A new repository is private. A private repository needs a token for each pull. A
 
 If you delete a tag, the layers stay on disk. Run garbage collection from the dashboard to free the space. Garbage collection also deletes manifests that have no tag. During the run, the registry rejects pushes.
 
+## Backups
+
+The registry can keep a backup of the newest image of each repository in an S3 bucket. The newest image is the last tag that you pushed, together with the other tags on the same image. The backup also holds the dashboard data: the account, the tokens, and the public or private state of each repository.
+
+The backup runs 15 seconds after a push, for that repository only. The server also backs up all repositories at start. The Back up now button on the storage card does the same. When a newer image replaces an older one, the backup removes the older image and its layers. A repository that you delete stays in the backup.
+
+To turn on backups, set `backup.s3.bucket` and the other `backup.s3` keys. The bucket must be private, because it holds the token hashes.
+
+The bucket uses the normal registry layout. To restore, start the registry with the backup bucket as its storage:
+
+```bash
+STORAGE_DRIVER=s3 S3_BUCKET=registry-backup S3_REGION=eu-central-1 S3_PREFIX=registry ./registry
+```
+
+The images, the account, and the tokens are then available again. To move the images back to disk storage, copy them with a tool such as `crane copy`.
+
 ## HTTPS and CDNs
 
 The server does not need TLS. It serves plain HTTP unless you set `TLS_CERT` and `TLS_KEY`. Docker needs HTTPS for a registry that is not on `localhost`. A reverse proxy or a CDN in front of the registry can supply HTTPS.
@@ -159,6 +175,10 @@ If a key is unknown or a value is not valid, the server stops at start.
 | `storage.s3.force_path_style` | `S3_FORCE_PATH_STYLE` | `false` | Set to `true` for MinIO and most S3-compatible services. |
 
 With S3, the dashboard keeps its data in the same bucket, under `dashboard/`. You do not need a volume.
+
+The `backup.s3` keys have the same meaning as the `storage.s3` keys. Their variables start with `BACKUP_S3_`, for example `BACKUP_S3_BUCKET`. If `backup.s3.bucket` is empty, backups are off. The backup bucket and prefix must differ from the storage bucket and prefix.
+
+In the Helm chart, set the backup keys under `config.backup.s3`. Put the credentials in `backup.accessKey` and `backup.secretKey`, or set `backup.existingSecret` to a secret that has the keys `accessKey` and `secretKey`.
 
 ## Logs
 
