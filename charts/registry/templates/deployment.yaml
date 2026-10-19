@@ -1,4 +1,6 @@
 {{- $s3 := eq (include "registry.s3" .) "true" }}
+{{- $s3Creds := and $s3 (or .Values.s3.existingSecret .Values.s3.accessKey) }}
+{{- $backupCreds := and (eq (include "registry.backup" .) "true") (or .Values.backup.existingSecret .Values.backup.accessKey) }}
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -35,8 +37,9 @@ spec:
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           args: ["-config", "/etc/registry/config.yaml"]
-          {{- if and $s3 (or .Values.s3.existingSecret .Values.s3.accessKey) }}
+          {{- if or $s3Creds $backupCreds }}
           env:
+            {{- if $s3Creds }}
             - name: S3_ACCESS_KEY
               valueFrom:
                 secretKeyRef:
@@ -47,6 +50,19 @@ spec:
                 secretKeyRef:
                   name: {{ include "registry.s3Secret" . }}
                   key: secretKey
+            {{- end }}
+            {{- if $backupCreds }}
+            - name: BACKUP_S3_ACCESS_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "registry.backupSecret" . }}
+                  key: accessKey
+            - name: BACKUP_S3_SECRET_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "registry.backupSecret" . }}
+                  key: secretKey
+            {{- end }}
           {{- end }}
           ports:
             - name: http

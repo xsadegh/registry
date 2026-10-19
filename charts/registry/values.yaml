@@ -17,6 +17,11 @@ s3:
   accessKey: ""
   secretKey: ""
 
+backup:
+  existingSecret: ""
+  accessKey: ""
+  secretKey: ""
+
 serviceAccount:
   create: true
   name: ""

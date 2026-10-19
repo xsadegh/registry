@@ -34,6 +34,14 @@ app.kubernetes.io/managed-by: {{ .Release.Service }}
 {{- .Values.s3.existingSecret | default (include "registry.fullname" .) -}}
 {{- end -}}
 
+{{- define "registry.backup" -}}
+{{- ne (dig "backup" "s3" "bucket" "" .Values.config) "" -}}
+{{- end -}}
+
+{{- define "registry.backupSecret" -}}
+{{- .Values.backup.existingSecret | default (printf "%s-backup" (include "registry.fullname" .)) -}}
+{{- end -}}
+
 {{- define "registry.config" -}}
 {{- $cfg := deepCopy .Values.config -}}
 {{- $server := get $cfg "server" | default (dict) -}}
