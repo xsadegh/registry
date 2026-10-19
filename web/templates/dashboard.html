@@ -10,6 +10,19 @@
 </div>
 {{end}}
 
+{{define "select"}}
+<div class="field">
+  <span id="{{.ID}}-label">{{.Label}}</span>
+  <div class="select" data-select>
+    <input type="hidden" name="{{.Name}}" value="{{.Current.Value}}">
+    <button type="button" class="select-btn" id="{{.ID}}" role="combobox" aria-haspopup="listbox" aria-expanded="false" aria-controls="{{.ID}}-list" aria-labelledby="{{.ID}}-label {{.ID}}"><span data-text>{{.Current.Label}}</span>{{icon "chevron-down" 14}}</button>
+    <ul class="select-list" id="{{.ID}}-list" role="listbox" aria-labelledby="{{.ID}}-label" popover="manual" tabindex="-1">
+      {{range $i, $o := .Options}}<li role="option" id="{{$.ID}}-{{$i}}" data-value="{{$o.Value}}" aria-selected="{{if $o.Selected}}true{{else}}false{{end}}"><span>{{$o.Label}}</span>{{icon "check" 14}}</li>{{end}}
+    </ul>
+  </div>
+</div>
+{{end}}
+
 {{define "content"}}
 <div class="app">
   <header class="top">
@@ -244,8 +257,8 @@
       <form method="post" action="/tokens" class="tok-form">
         <input type="hidden" name="back" value="{{.Back}}">
         <label class="field">Name<input class="input" name="name" placeholder="ci-deploy" required></label>
-        <label class="field">Access<select class="input" name="access"><option value="pull">Pull</option><option value="push">Pull and push</option></select></label>
-        <label class="field">Expires<select class="input" name="expires"><option value="30">In 30 days</option><option value="90">In 90 days</option><option value="365">In 1 year</option><option value="0">Never</option></select></label>
+        {{template "select" .Access}}
+        {{template "select" .Expires}}
         <label class="field full">Repositories<input class="input mono" name="repos" list="repo-names" placeholder="All repositories" autocomplete="off"><small>Leave empty for all repositories. Separate names with commas. team/* matches all repositories in team.</small></label>
         <datalist id="repo-names">{{range .RepoNames}}<option value="{{.}}">{{end}}</datalist>
         <div class="full end"><button class="b-ok" data-busy>{{icon "plus" 14}}Create token</button></div>

@@ -253,6 +253,19 @@ dialog::backdrop{background:rgba(0,0,0,.6)}
 .field{display:flex;flex-direction:column;gap:5px;font-size:12px;color:var(--mute)}
 .field small{font-size:11.5px;color:var(--mute2)}
 .input{height:34px;padding:0 10px;border-radius:9px;font-size:13px}
+.select{position:relative}
+.select-btn{width:100%;height:34px;padding:0 10px 0 11px;border:1px solid var(--edge);border-radius:9px;background:var(--bar);color:var(--fg);font-size:13px;display:flex;align-items:center;justify-content:space-between;gap:10px;text-align:left}
+.select-btn span{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.select-btn .i{color:var(--icon);transition:transform .15s ease}
+.select-btn:hover{border-color:var(--edge2)}
+.select-btn:focus-visible,.select-btn[aria-expanded="true"]{outline:none;border-color:var(--edge3);box-shadow:0 0 0 3px rgba(107,191,142,.14)}
+.select-btn[aria-expanded="true"] .i{transform:rotate(180deg)}
+.select-list{position:fixed;inset:auto;margin:0;padding:4px;max-height:240px;overflow:auto;list-style:none;background:#1E1F21;border:1px solid var(--edge);border-radius:11px;box-shadow:0 12px 32px rgba(0,0,0,.45);color:var(--fg2)}
+.select-list li{display:flex;align-items:center;justify-content:space-between;gap:16px;height:30px;padding:0 8px 0 9px;border-radius:7px;font-size:13px;white-space:nowrap;cursor:pointer}
+.select-list li.active{background:var(--track);color:var(--fg)}
+.select-list li[aria-selected="true"]{color:var(--fg)}
+.select-list li .i{color:var(--accent);stroke-width:2.2;visibility:hidden}
+.select-list li[aria-selected="true"] .i{visibility:visible}
 .full{grid-column:1/-1}
 .end{display:flex;justify-content:flex-end}
 

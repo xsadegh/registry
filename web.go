@@ -450,7 +450,40 @@ type dashView struct {
 	NewToken, Toast                    string
 	OpenTokens                         bool
 	RepoNames                          []string
+	Access, Expires                    selectView
 }
+
+type option struct {
+	Value, Label string
+	Selected     bool
+}
+
+type selectView struct {
+	ID, Name, Label string
+	Options         []option
+}
+
+func (s selectView) Current() option {
+	for _, o := range s.Options {
+		if o.Selected {
+			return o
+		}
+	}
+	return s.Options[0]
+}
+
+var (
+	accessSelect = selectView{ID: "token-access", Name: "access", Label: "Access", Options: []option{
+		{Value: "pull", Label: "Pull", Selected: true},
+		{Value: "push", Label: "Pull and push"},
+	}}
+	expiresSelect = selectView{ID: "token-expires", Name: "expires", Label: "Expires", Options: []option{
+		{Value: "30", Label: "In 30 days", Selected: true},
+		{Value: "90", Label: "In 90 days"},
+		{Value: "365", Label: "In 1 year"},
+		{Value: "0", Label: "Never"},
+	}}
+)
 
 func fmtBytes(n int64) string {
 	mb := float64(n) / (1 << 20)
@@ -631,6 +664,7 @@ func (s *server) dashboard(w http.ResponseWriter, r *http.Request, user string) 
 		GCBusy:   s.reg.gcBusy.Load(),
 	}
 	v.OpenTokens = v.NewToken != "" || takeFlash(w, r, "tokens") != ""
+	v.Access, v.Expires = accessSelect, expiresSelect
 	if v.Sort != "recent" {
 		v.Query = "?sort=" + url.QueryEscape(v.Sort)
 	}
