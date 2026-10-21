@@ -89,6 +89,8 @@ For the `/v2/*` and `/token` paths, use this configuration:
 - An origin request policy that forwards all viewer headers, so that the `Authorization` header gets to the registry.
 - All HTTP methods allowed.
 
+CloudFront sends only the first of several `Accept` headers with the same name to the origin. Docker sends each manifest type in its own `Accept` header, in a random order. The registry adds all manifest types to each manifest read, so pulls through CloudFront work. The registry always returns the manifest as it was pushed.
+
 ## Kubernetes
 
 The Helm chart is in [charts/registry](charts/registry). It runs one replica, because the server keeps the dashboard state in memory.

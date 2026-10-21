@@ -12,6 +12,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	v1 "github.com/opencontainers/image-spec/specs-go/v1"
 )
 
 const (
@@ -20,6 +22,8 @@ const (
 )
 
 var v2Path = regexp.MustCompile(`^/v2/(.+)/(manifests|blobs|tags|referrers)/(.*)$`)
+
+var manifestTypes = strings.Join([]string{v1.MediaTypeImageIndex, v1.MediaTypeImageManifest, dockerList, dockerManifest}, ", ")
 
 func (s *server) mac(msg string) string {
 	m := hmac.New(sha256.New, s.store.secret())
@@ -224,6 +228,9 @@ func (s *server) guard(next http.Handler) http.Handler {
 				return
 			}
 			defer s.reg.gcLock.RUnlock()
+		}
+		if m != nil && m[2] == "manifests" && action == "pull" {
+			r.Header.Add("Accept", manifestTypes)
 		}
 		rec := &recorder{ResponseWriter: w, status: http.StatusOK}
 		next.ServeHTTP(rec, r)
